@@ -1,0 +1,64 @@
+import numpy as np
+
+def saxton_rawls(pSand, pClay, pOM):
+    """
+    Saxton, K.E., & Rawls, W.J. (2006). Soil water characteristic estimates by texture and organic matter for hydrologic solutions.
+    Soil Science Society of America Journal, 70(5), 1569–1578. doi:10.2136/sssaj2005.0117. 
+    
+    Inputs:
+        pSand : % Sand (by volume, decimal or integer 0–100)
+        pClay : % Clay (by volume, decimal or integer 0–100)
+        pOM   : % Organic Matter (by weight, decimal or integer 0–100)
+    
+    Returns:
+        dict with BD, LL15, DUL, SAT, SWCON, KSAT
+    """
+    # convert to fraction
+    pSand = np.array(pSand, dtype=float) / 100.0
+    pClay = np.array(pClay, dtype=float) / 100.0
+    pOM   = np.array(pOM, dtype=float) / 100.0
+    
+    # LL15 (theta_1500)
+    theta_1500t = (-0.024*pSand + 0.487*pClay + 0.006*pOM +
+                   0.005*pSand*pOM - 0.013*pClay*pOM + 
+                   0.068*pSand*pClay + 0.031)
+    LL15 = theta_1500t + (0.14*theta_1500t - 0.02)
+    LL15 = np.round(np.clip(LL15, 0.01, 0.99), 3)
+    
+    # DUL (theta_33)
+    theta_33t = (-0.251*pSand + 0.195*pClay + 0.011*pOM +
+                 0.006*pSand*pOM - 0.027*pClay*pOM +
+                 0.452*pSand*pClay + 0.299)
+    DUL = theta_33t + (1.283*theta_33t**2 - 0.374*theta_33t - 0.015)
+    DUL = np.round(np.clip(DUL, 0.01, 0.99), 3)
+    
+    # theta_sat33
+    theta_sat33t = (0.278*pSand + 0.034*pClay + 0.022*pOM -
+                    0.018*pSand*pOM - 0.027*pClay*pOM -
+                    0.584*pSand*pClay + 0.078)
+    theta_sat33 = theta_sat33t + (0.636*theta_sat33t - 0.107)
+    
+    # SAT
+    SAT = DUL + theta_sat33 - 0.097*pSand + 0.043
+    SAT = np.round(np.clip(SAT, 0.01, 0.99), 3)
+    
+    # Bulk density (BD)
+    BD = (1 - SAT) * 2.65
+    BD = np.round(np.clip(BD, 1.0, 2.1), 3)
+    
+    # ksat and SWCON
+    lambda_val = (np.log(DUL) - np.log(LL15)) / (np.log(1500) - np.log(33))
+    ksat = 1930 * ((SAT - DUL) ** (3 - lambda_val))
+    SWCON = np.round(0.15 + np.minimum(ksat, 75) / 100, 3)
+    
+    return {
+        "BD": BD,
+        "LL15": LL15 * 100,
+        "DUL": DUL * 100,
+        "SAT": SAT * 100,
+        "SWCON": SWCON * 100,
+        "KSAT": ksat
+    }
+
+# Example usage
+print(saxton_rawls([2,2], [30,30], [4,3]))
